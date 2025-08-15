@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>法律判定分析工具 | Legal Judgment Analysis Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        accent: '#722ED1',
+                        neutral: '#F5F7FA',
+                        'neutral-dark': '#4E5969',
+                        success: '#52C41A',
+                        warning: '#FAAD14',
+                        danger: '#FF4D4F',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .sentence-badge {
+                @apply inline-block px-2 py-1 text-xs rounded-full bg-danger/10 text-danger font-medium;
+            }
+            .law-article {
+                @apply text-sm text-neutral-dark italic mt-1;
+            }
+            .input-field {
+                @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300;
+            }
+            .modal-backdrop {
+                @apply fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300;
+            }
+            .modal-backdrop.active {
+                @apply opacity-100 pointer-events-auto;
+            }
+            .modal-content {
+                @apply bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto transform translate-y-8 transition-transform duration-300;
+            }
+            .modal-backdrop.active .modal-content {
+                @apply translate-y-0;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-neutral min-h-screen text-gray-800">
+    <!-- 顶部导航 -->
+    <header class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-balance-scale text-primary text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold text-gray-800" data-i18n="app.title">法律判定分析工具</h1>
+            </div>
+            <div class="hidden md:flex items-center space-x-6">
+                <a href="#" class="text-neutral-dark hover:text-primary transition-colors" id="instructionsLink" data-i18n="nav.instructions">使用说明</a>
+                <a href="#" class="text-neutral-dark hover:text-primary transition-colors" id="aboutLink" data-i18n="nav.about">关于</a>
+                <div class="flex items-center border rounded-lg overflow-hidden">
+                    <button class="language-btn px-3 py-1 bg-primary text-white" data-lang="zh">中文</button>
+                    <button class="language-btn px-3 py-1 bg-white text-gray-600 hover:bg-gray-100" data-lang="en">English</button>
+                </div>
+            </div>
+            <button class="md:hidden text-gray-600 flex items-center" id="menuToggle">
+                <i class="fa fa-bars text-xl mr-2"></i>
+                <span class="flex items-center border rounded-lg overflow-hidden">
+                    <button class="language-btn px-2 py-1 bg-primary text-white text-sm" data-lang="zh">中</button>
+                    <button class="language-btn px-2 py-1 bg-white text-gray-600 hover:bg-gray-100 text-sm" data-lang="en">En</button>
+                </span>
+            </button>
+        </div>
+        <!-- 移动端菜单 -->
+        <div id="mobileMenu" class="hidden md:hidden bg-white border-t">
+            <div class="container mx-auto px-4 py-3 flex flex-col space-y-3">
+                <a href="#" class="text-neutral-dark hover:text-primary transition-colors py-2" id="mobileInstructionsLink" data-i18n="nav.instructions">使用说明</a>
+                <a href="#" class="text-neutral-dark hover:text-primary transition-colors py-2" id="mobileAboutLink" data-i18n="nav.about">关于</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8 md:py-12">
+        <!-- 进度指示器 -->
+        <div class="max-w-3xl mx-auto mb-8">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-neutral-dark" data-i18n="progress.label">完成进度</span>
+                <span class="text-sm font-medium text-primary" id="progressText">0/10</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                <div id="progressBar" class="bg-primary h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 问题容器 -->
+        <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow-md overflow-hidden mb-8 transition-custom">
+            <div class="bg-primary/5 p-6 border-b border-gray-100">
+                <h2 id="questionNumber" class="text-sm font-medium text-primary mb-2" data-i18n="question.number">问题 1/10</h2>
+                <h3 id="questionText" class="text-xl font-bold text-gray-800">是否存在婚姻关系？</h3>
+            </div>
+            
+            <div id="optionsContainer" class="p-6 space-y-3">
+                <!-- 选项将通过JavaScript动态生成 -->
+            </div>
+        </div>
+
+        <!-- 导航按钮 -->
+        <div class="max-w-3xl mx-auto flex justify-between">
+            <button id="prevBtn" class="btn-secondary opacity-50 cursor-not-allowed" disabled>
+                <i class="fa fa-arrow-left mr-2"></i>
+                <span data-i18n="btn.prev">上一步</span>
+            </button>
+            <button id="nextBtn" class="btn-primary opacity-50 cursor-not-allowed" disabled>
+                <span data-i18n="btn.next">下一步</span>
+                <i class="fa fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+
+        <!-- 结果区域 (初始隐藏) -->
+        <div id="resultContainer" class="max-w-3xl mx-auto hidden">
+            <div class="bg-white rounded-2xl shadow-md overflow-hidden mb-8">
+                <div class="bg-success/10 p-6 border-b border-gray-100">
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                        <i class="fa fa-check-circle text-success mr-2"></i>
+                        <span data-i18n="result.title">判定结果</span>
+                    </h2>
+                </div>
+                <div class="p-6">
+                    <div id="resultContent" class="space-y-6">
+                        <!-- 结果将通过JavaScript动态生成 -->
+                    </div>
+                    <div class="mt-6 pt-6 border-t border-gray-100">
+                        <div class="bg-yellow-50 p-4 rounded-lg mb-4 text-sm text-yellow-800">
+                            <i class="fa fa-info-circle mr-1"></i>
+                            <span data-i18n="result.note">注：以下刑期仅供参考，实际判决会根据犯罪情节、社会危害程度、悔罪表现等因素综合判定。具体法律问题请咨询专业律师。</span>
+                        </div>
+                        <button id="restartBtn" class="btn-primary w-full">
+                            <i class="fa fa-refresh mr-2"></i>
+                            <span data-i18n="btn.restart">重新开始</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 使用说明模态框 -->
+    <div id="instructionsModal" class="modal-backdrop">
+        <div class="modal-content">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800" data-i18n="instructions.title">使用说明</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4" id="instructionsContent">
+                <!-- 内容将通过JavaScript动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 关于模态框 -->
+    <div id="aboutModal" class="modal-backdrop">
+        <div class="modal-content">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800" data-i18n="about.title">关于</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4" id="aboutContent">
+                <!-- 内容将通过JavaScript动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-gray-200 py-6">
+        <div class="container mx-auto px-4 text-center text-neutral-dark text-sm">
+            <p data-i18n="footer.disclaimer">本工具仅供参考，不构成法律意见。具体法律问题请咨询专业律师。</p>
+            <p class="mt-2" data-i18n="footer.copyright">&copy; 2023 法律判定分析工具</p>
+        </div>
+    </footer>
+
+    <script>
+        // 多语言支持 - 语言包
+        const i18n = {
+            zh: {
+                app: {
+                    title: "法律判定分析工具"
+                },
+                nav: {
+                    instructions: "使用说明",
+                    about: "关于"
+                },
+                progress: {
+                    label: "完成进度"
+                },
+                question: {
+                    number: "问题 {current}/{total}"
+                },
+                btn: {
+                    prev: "上一步",
+                    next: "下一步",
+                    restart: "重新开始"
+                },
+                result: {
+                    title: "判定结果",
+                    note: "注：以下刑期仅供参考，实际判决会根据犯罪情节、社会危害程度、悔罪表现等因素综合判定。具体法律问题请咨询专业律师。"
+                },
+                footer: {
+                    disclaimer: "本工具仅供参考，不构成法律意见。具体法律问题请咨询专业律师。",
+                    copyright: "&copy; 2023 法律判定分析工具"
+                },
+                instructions: {
+                    title: "使用说明",
+                    intro: "本工具用于根据输入的案件信息，提供相应的法律判定参考。使用步骤如下：",
+                    step1: "1. 按照提示依次回答各个问题，选择最符合实际情况的选项",
+                    step2: "2. 对于年龄等需要输入的信息，请准确填写",
+                    step3: "3. 完成所有问题后，系统将自动生成判定结果",
+                    step4: "4. 结果仅供参考，具体法律问题请咨询专业律师",
+                    note: "提示：您可以随时点击页面顶部的语言按钮切换中英文显示。"
+                },
+                about: {
+                    title: "关于",
+                    content: "本法律判定分析工具基于中国现行法律条文开发，旨在提供法律知识普及和参考。",
+                    legalBasis: "法律依据主要包括：",
+                    basis1: "1. 《中华人民共和国刑法》相关条款",
+                    basis2: "2. 《中华人民共和国治安管理处罚法》相关条款",
+                    reminder: "重要提示：本工具提供的结果仅供参考，不构成任何法律意见或建议。任何法律问题均应咨询专业律师。"
+                },
+                questions: {
+                    1: "是否存在婚姻关系？",
+                    2: "加害方年龄（周岁，以身份证件为准）",
+                    3: "受害方年龄（周岁，以身份证件为准）",
+                    4: "是否造成轻伤二级以上伤害？",
+                    5: "是否针对未成年人？",
+                    6: "是否处于恋爱关系？",
+                    7: "是否已经订婚？",
+                    8: "是否处于同居状态？",
+                    9: "婚姻状态？",
+                    10: "加害方性别及受害方性别？",
+                    11: "行为性质？",
+                    12: "插入部位？",
+                    13: "非插入接触部位或方式？",
+                    14: "是否一人对二人以上实施？",
+                    15: "是否在公共场所当众实施？",
+                    16: "是否二人以上轮奸？",
+                    17: "是否致使被害人重伤？",
+                    18: "是否致使被害人死亡？",
+                    19: "是否造成其他严重后果？",
+                    20: "是否取得被害人谅解？",
+                    21: "是否有撤诉情节？",
+                    22: "未成年受害方性别？"
+                },
+                options: {
+                    yes: "是",
+                    no: "否",
+                    question1: {
+                        yes: "是，存在婚姻关系",
+                        no: "否，非婚姻关系"
+                    },
+                    question4: {
+                        yes: "是，造成轻伤二级以上",
+                        no: "否，未造成或轻微伤"
+                    },
+                    question5: {
+                        yes: "是，受害方为未成年人",
+                        no: "否，受害方为成年人"
+                    },
+                    question9: {
+                        normal: "正常存续/分居",
+                        "divorce-lawsuit": "离婚诉讼中",
+                        dissolved: "婚姻解除/无效"
+                    },
+                    question10: {
+                        "male-to-female": "男→女",
+                        "female-to-male": "女→男"
+                    },
+                    question11: {
+                        insertive: "插入式性交",
+                        "non-insertive": "非插入猥亵",
+                        "minor-injury-plus": "致轻伤+"
+                    },
+                    question12: {
+                        vaginal: "阴道",
+                        oral: "口腔",
+                        anal: "肛门"
+                    },
+                    question13: {
+                        hand: "手部接触隐私部位",
+                        breast: "胸部接触",
+                        "other-body": "其他身体部位接触隐私部位",
+                        "other-form": "其他形式的猥亵行为"
+                    },
+                    question14: {
+                        yes: "是，一人对二人以上实施",
+                        no: "否，仅对一人实施"
+                    },
+                    question15: {
+                        yes: "是，在公共场所当众实施",
+                        no: "否，非公共场所或非当众实施"
+                    },
+                    question16: {
+                        yes: "是，二人以上轮奸",
+                        no: "否，非轮奸"
+                    },
+                    question17: {
+                        yes: "是，致使被害人重伤",
+                        no: "否，未致使被害人重伤"
+                    },
+                    question18: {
+                        yes: "是，致使被害人死亡",
+                        no: "否，未致使被害人死亡"
+                    },
+                    question19: {
+                        yes: "是，造成其他严重后果",
+                        no: "否，未造成其他严重后果"
+                    },
+                    question20: {
+                        yes: "是，已取得被害人谅解",
+                        no: "否，未取得被害人谅解"
+                    },
+                    question21: {
+                        yes: "是，被害人已撤诉",
+                        no: "否，被害人未撤诉"
+                    },
+                    question22: {
+                        boy: "男童",
+                        girl: "女童"
+                    }
+                },
+                placeholders: {
+                    2: "请输入加害方年龄",
+                    3: "请输入受害方年龄"
+                },
+                summary: {
+                    agePerpetrator: "加害方年龄：",
+                    ageVictim: "受害方年龄：",
+                    maritalStatus: "婚姻状况：",
+                    genderRelation: "性别关系：",
+                    behaviorNature: "行为性质：",
+                    aggravatingFactors: "加重情节：",
+                    mitigatingFactors: "减轻情节：",
+                    minor: "未成年人",
+                    maritalStatusYes: "存在婚姻关系（{status}）",
+                    maritalStatusNo: "非婚姻关系（{relations}）",
+                    maritalStatusNormal: "正常存续/分居",
+                    maritalStatusDivorce: "离婚诉讼中",
+                    maritalStatusDissolved: "婚姻解除/无效",
+                    relationshipLove: "恋爱",
+                    relationshipEngaged: "订婚",
+                    relationshipLiving: "同居",
+                    relationshipNone: "无特殊关系",
+                    behaviorInsertive: "插入式性交（{part}）",
+                    behaviorNonInsertive: "非插入猥亵（{method}）",
+                    behaviorInjury: "致轻伤+",
+                    bodyPartVaginal: "阴道",
+                    bodyPartOral: "口腔",
+                    bodyPartAnal: "肛门",
+                    contactHand: "手部接触隐私部位",
+                    contactBreast: "胸部接触",
+                    contactOtherBody: "其他身体部位接触隐私部位",
+                    contactOtherForm: "其他形式的猥亵行为",
+                    factorMultiple: "一人对二人以上实施",
+                    factorPublic: "在公共场所当众实施",
+                    factorGangRape: "二人以上轮奸",
+                    factorSeriousInjury: "致使被害人重伤",
+                    factorDeath: "致使被害人死亡",
+                    factorOtherSerious: "造成其他严重后果",
+                    factorNo: "无",
+                    factorPardon: "取得被害人谅解",
+                    factorWithdraw: "被害人已撤诉"
+                },
+                crimes: {
+                    "强奸罪": "强奸罪",
+                    "强奸罪从重": "强奸罪从重",
+                    "强制猥亵罪": "强制猥亵罪",
+                    "猥亵儿童罪": "猥亵儿童罪",
+                    "故意伤害罪": "故意伤害罪",
+                    "治安处罚": "治安处罚",
+                    "可构成强奸罪": "可构成强奸罪",
+                    "构成强奸罪": "构成强奸罪",
+                    "可能强制猥亵罪": "可能强制猥亵罪",
+                    "不构罪": "不构罪"
+                },
+                crimeDetails: {
+                    "强奸罪": {
+                        basic: "3-10年有期徒刑",
+                        severe: "10年以上有期徒刑、无期徒刑或者死刑",
+                        severeConditions: "情节恶劣；多人强奸；在公共场所当众强奸；二人以上轮奸；致使被害人重伤、死亡或者造成其他严重后果",
+                        article: "《刑法》第二百三十六条"
+                    },
+                    "强奸罪从重": {
+                        basic: "3-10年有期徒刑（从重处罚）",
+                        severe: "10年以上有期徒刑、无期徒刑或者死刑",
+                        note: "针对未成年人的强奸行为应当从重处罚",
+                        article: "《刑法》第二百三十六条、第三款"
+                    },
+                    "强制猥亵罪": {
+                        basic: "5年以下有期徒刑或者拘役",
+                        severe: "5年以上有期徒刑",
+                        severeConditions: "聚众或者在公共场所当众犯前款罪；有其他恶劣情节",
+                        article: "《刑法》第二百三十七条"
+                    },
+                    "猥亵儿童罪": {
+                        basic: "5年以下有期徒刑",
+                        severe: "5年以上有期徒刑",
+                        severeConditions: "猥亵儿童多人或者多次；聚众猥亵儿童；在公共场所当众猥亵儿童；造成儿童伤害或者其他严重后果；有其他恶劣情节",
+                        note: "猥亵儿童的，依照前两款的规定从重处罚",
+                        article: "《刑法》第二百三十七条、第三款"
+                    },
+                    "故意伤害罪": {
+                        basic: "3年以下有期徒刑、拘役或者管制",
+                        medium: "3-10年有期徒刑（致人重伤）",
+                        severe: "10年以上有期徒刑、无期徒刑或者死刑（致人死亡或者以特别残忍手段致人重伤造成严重残疾）",
+                        article: "《刑法》第二百三十四条"
+                    },
+                    "治安处罚": {
+                        content: "处5-10日拘留，并处200-500元罚款；情节较轻的，处5日以下拘留或者500元以下罚款",
+                        article: "《治安管理处罚法》第四十四条"
+                    },
+                    "可构成强奸罪": {
+                        explanation: "在离婚诉讼期间，婚姻关系尚未完全解除，强行发生性关系可能构成强奸罪，具体需结合案件情况判断",
+                        reference: "参考《刑法》第二百三十六条"
+                    },
+                    "构成强奸罪": {
+                        sameAs: "强奸罪",
+                        explanation: "婚姻关系已解除或无效的情况下，强行发生性关系构成强奸罪"
+                    },
+                    "可能强制猥亵罪": {
+                        sameAs: "强制猥亵罪",
+                        explanation: "女性对男性实施猥亵行为可能构成强制猥亵罪"
+                    },
+                    "不构罪": {
+                        explanation: "在正常婚姻关系存续期间，一般不构成刑事犯罪"
+                    }
+                },
+                resultText: {
+                    basicSentence: "基础刑期：",
+                    mediumSentence: "加重刑期（致人重伤）：",
+                    severeSentence: "严重情节刑期：",
+                    severeFactors: "本案存在以下严重情节：{factors}，可能适用更重刑期",
+                    mitigatingFactors: "本案存在以下减轻情节：{factors}，可能从轻或减轻处罚",
+                    minorPerpetrator: "加害方为未成年人，应当从轻或者减轻处罚",
+                    noteLabel: "注：",
+                    explanationLabel: "说明："
+                }
+            },
+            en: {
+                app: {
+                    title: "Legal Judgment Analysis Tool"
+                },
+                nav: {
+                    instructions: "Instructions",
+                    about: "About"
+                },
+                progress: {
+                    label: "Progress"
+                },
+                question: {
+                    number: "Question {current}/{total}"
+                },
+                btn: {
+                    prev: "Previous",
+                    next: "Next",
+                    restart: "Restart"
+                },
+                result: {
+                    title: "Judgment Result",
+                    note: "Note: The following sentences are for reference only. Actual judgments will be determined based on the circumstances of the crime, social harm, remorse, and other factors. For specific legal issues, please consult a professional lawyer."
+                },
+                footer: {
+                    disclaimer: "This tool is for reference only and does not constitute legal advice. For specific legal issues, please consult a professional lawyer.",
+                    copyright: "&copy; 2023 Legal Judgment Analysis Tool"
+                },
+                instructions: {
+                    title: "Instructions",
+                    intro: "This tool is used to provide legal judgment references based on the input case information. The steps are as follows:",
+                    step1: "1. Answer each question in turn according to the prompts, selecting the option that best matches the actual situation",
+                    step2: "2. For information that needs to be entered such as age, please fill in accurately",
+                    step3: "3. After completing all questions, the system will automatically generate the judgment result",
+                    step4: "4. The results are for reference only. For specific legal issues, please consult a professional lawyer",
+                    note: "Tip: You can click the language button at the top of the page to switch between Chinese and English display at any time."
+                },
+                about: {
+                    title: "About",
+                    content: "This legal judgment analysis tool is developed based on the current legal provisions of the People's Republic of China, aiming to provide legal knowledge popularization and reference.",
+                    legalBasis: "The legal basis mainly includes:",
+                    legalBasis: "The legal basis mainly includes:",
+                    basis1: "1. Relevant provisions of the Criminal Law of the People's Republic of China",
+                    basis2: "2. Relevant provisions of the Public Security Administration Punishment Law of the People's Republic of China",
+                    reminder: "Important reminder: The results provided by this tool are for reference only and do not constitute any legal opinion or advice. All legal issues should be consulted with a professional lawyer."
+                },
+                questions: {
+                    1: "Is there a marital relationship?",
+                    2: "Age of the perpetrator (in years, based on ID documents)",
+                    3: "Age of the victim (in years, based on ID documents)",
+                    4: "Is there an injury above level 2 minor injury?",
+                    5: "Is it against a minor?",
+                    6: "Is there a romantic relationship?",
+                    7: "Are they engaged?",
+                    8: "Are they cohabiting?",
+                    9: "Marital status?",
+                    10: "Gender of perpetrator and gender of victim?",
+                    11: "Nature of the act?",
+                    12: "Insertion site?",
+                    13: "Non-insertive contact site or method?",
+                    14: "Is it committed by one person against two or more people?",
+                    15: "Is it committed in public?",
+                    16: "Is it gang rape by two or more people?",
+                    17: "Did it cause serious injury to the victim?",
+                    18: "Did it cause the death of the victim?",
+                    19: "Did it cause other serious consequences?",
+                    20: "Has the victim's understanding been obtained?",
+                    21: "Is there a withdrawal of charges?",
+                    22: "Gender of minor victim?"
+                },
+                options: {
+                    yes: "Yes",
+                    no: "No",
+                    question1: {
+                        yes: "Yes, there is a marital relationship",
+                        no: "No, no marital relationship"
+                    },
+                    question4: {
+                        yes: "Yes, causing injury above level 2 minor injury",
+                        no: "No, no injury or minor injury only"
+                    },
+                    question5: {
+                        yes: "Yes, the victim is a minor",
+                        no: "No, the victim is an adult"
+                    },
+                    question9: {
+                        normal: "Normal marriage/separated",
+                        "divorce-lawsuit": "In divorce proceedings",
+                        dissolved: "Marriage dissolved/invalid"
+                    },
+                    question10: {
+                        "male-to-female": "Male→Female",
+                        "female-to-male": "Female→Male"
+                    },
+                    question11: {
+                        insertive: "Insertive intercourse",
+                        "non-insertive": "Non-insertive indecency",
+                        "minor-injury-plus": "Causing minor injury+"
+                    },
+                    question12: {
+                        vaginal: "Vaginal",
+                        oral: "Oral",
+                        anal: "Anal"
+                    },
+                    question13: {
+                        hand: "Hand contact with private parts",
+                        breast: "Breast contact",
+                        "other-body": "Other body parts contact with private parts",
+                        "other-form": "Other forms of indecent acts"
+                    },
+                    question14: {
+                        yes: "Yes, by one person against two or more",
+                        no: "No, against only one person"
+                    },
+                    question15: {
+                        yes: "Yes, committed in public",
+                        no: "No, not in public or not in presence of others"
+                    },
+                    question16: {
+                        yes: "Yes, gang rape by two or more",
+                        no: "No, not gang rape"
+                    },
+                    question17: {
+                        yes: "Yes, causing serious injury to the victim",
+                        no: "No, not causing serious injury to the victim"
+                    },
+                    question18: {
+                        yes: "Yes, causing death of the victim",
+                        no: "No, not causing death of the victim"
+                    },
+                    question19: {
+                        yes: "Yes, causing other serious consequences",
+                        no: "No, not causing other serious consequences"
+                    },
+                    question20: {
+                        yes: "Yes, obtained victim's understanding",
+                        no: "No, not obtained victim's understanding"
+                    },
+                    question21: {
+                        yes: "Yes, victim has withdrawn charges",
+                        no: "No, victim has not withdrawn charges"
+                    },
+                    question22: {
+                        boy: "Boy",
+                        girl: "Girl"
+                    }
+                },
+                placeholders: {
+                    2: "Please enter the age of the perpetrator",
+                    3: "Please enter the age of the victim"
+                },
+                summary: {
+                    agePerpetrator: "Perpetrator's age: ",
+                    ageVictim: "Victim's age: ",
+                    maritalStatus: "Marital status: ",
+                    genderRelation: "Gender relationship: ",
+                    behaviorNature: "Nature of behavior: ",
+                    aggravatingFactors: "Aggravating circumstances: ",
+                    mitigatingFactors: "Mitigating circumstances: ",
+                    minor: "Minor",
+                    maritalStatusYes: "Has marital relationship ({status})",
+                    maritalStatusNo: "No marital relationship ({relations})",
+                    maritalStatusNormal: "Normal marriage/separated",
+                    maritalStatusDivorce: "In divorce proceedings",
+                    maritalStatusDissolved: "Marriage dissolved/invalid",
+                    relationshipLove: "Romantic relationship",
+                    relationshipEngaged: "Engaged",
+                    relationshipLiving: "Cohabiting",
+                    relationshipNone: "No special relationship",
+                    behaviorInsertive: "Insertive intercourse ({part})",
+                    behaviorNonInsertive: "Non-insertive indecency ({method})",
+                    behaviorInjury: "Causing minor injury+",
+                    bodyPartVaginal: "Vaginal",
+                    bodyPartOral: "Oral",
+                    bodyPartAnal: "Anal",
+                    contactHand: "Hand contact with private parts",
+                    contactBreast: "Breast contact",
+                    contactOtherBody: "Other body parts contact with private parts",
+                    contactOtherForm: "Other forms of indecent acts",
+                    factorMultiple: "By one person against two or more",
+                    factorPublic: "Committed in public",
+                    factorGangRape: "Gang rape by two or more",
+                    factorSeriousInjury: "Causing serious injury to victim",
+                    factorDeath: "Causing death of victim",
+                    factorOtherSerious: "Causing other serious consequences",
+                    factorNo: "None",
+                    factorPardon: "Obtained victim's understanding",
+                    factorWithdraw: "Victim has withdrawn charges"
+                },
+                crimes: {
+                    "强奸罪": "Rape",
+                    "强奸罪从重": "Rape (aggravated)",
+                    "强制猥亵罪": "Forcible indecency",
+                    "猥亵儿童罪": "Indecency against children",
+                    "故意伤害罪": "Intentional injury",
+                    "治安处罚": "Public security punishment",
+                    "可构成强奸罪": "May constitute rape",
+                    "构成强奸罪": "Constitutes rape",
+                    "可能强制猥亵罪": "May constitute forcible indecency",
+                    "不构罪": "Does not constitute a crime"
+                },
+                crimeDetails: {
+                    "强奸罪": {
+                        basic: "3-10 years imprisonment",
+                        severe: "More than 10 years imprisonment, life imprisonment, or death penalty",
+                        severeConditions: "Aggravated circumstances; rape of multiple persons; rape in public; gang rape by two or more persons; causing serious injury or death to the victim, or causing other serious consequences",
+                        article: "Article 236 of the Criminal Law"
+                    },
+                    "强奸罪从重": {
+                        basic: "3-10 years imprisonment (aggravated punishment)",
+                        severe: "More than 10 years imprisonment, life imprisonment, or death penalty",
+                        note: "Rape against minors shall be given heavier punishment",
+                        article: "Article 236, Paragraph 3 of the Criminal Law"
+                    },
+                    "强制猥亵罪": {
+                        basic: "Up to 5 years imprisonment or criminal detention",
+                        severe: "More than 5 years imprisonment",
+                        severeConditions: "Gathering people to commit the crime or committing it in public; other serious circumstances",
+                        article: "Article 237 of the Criminal Law"
+                    },
+                    "猥亵儿童罪": {
+                        basic: "Up to 5 years imprisonment",
+                        severe: "More than 5 years imprisonment",
+                        severeConditions: "Indecency against multiple children or repeatedly; gathering people to indecently assault children; indecently assaulting children in public; causing injury or other serious consequences to children; other serious circumstances",
+                        note: "Indecency against children shall be given heavier punishment in accordance with the provisions of the preceding two paragraphs",
+                        article: "Article 237, Paragraph 3 of the Criminal Law"
+                    },
+                    "故意伤害罪": {
+                        basic: "Up to 3 years imprisonment, criminal detention, or public surveillance",
+                        medium: "3-10 years imprisonment (causing serious injury)",
+                        severe: "More than 10 years imprisonment, life imprisonment, or death penalty (causing death or causing serious disability by especially cruel means)",
+                        article: "Article 234 of the Criminal Law"
+                    },
+                    "治安处罚": {
+                        content: "5-10 days detention and a fine of 200-500 yuan; for minor circumstances, 5 days or less detention or a fine of 500 yuan or less",
+                        article: "Article 44 of the Public Security Administration Punishment Law"
+                    },
+                    "可构成强奸罪": {
+                        explanation: "During divorce proceedings, the marital relationship has not been completely dissolved, and forced sexual relations may constitute rape, which needs to be judged based on the specific circumstances of the case",
+                        reference: "Refer to Article 236 of the Criminal Law"
+                    },
+                    "构成强奸罪": {
+                        sameAs: "强奸罪",
+                        explanation: "When the marital relationship has been dissolved or is invalid, forced sexual relations constitute rape"
+                    },
+                    "可能强制猥亵罪": {
+                        sameAs: "强制猥亵罪",
+                        explanation: "Indecent acts committed by women against men may constitute forcible indecency"
+                    },
+                    "不构罪": {
+                        explanation: "During the normal existence of a marital relationship, it generally does not constitute a criminal offense"
+                    }
+                },
+                resultText: {
+                    basicSentence: "Basic sentence: ",
+                    mediumSentence: "Aggravated sentence (causing serious injury): ",
+                    severeSentence: "Serious circumstances sentence: ",
+                    severeFactors: "This case has the following serious circumstances: {factors}, which may result in a heavier sentence",
+                    mitigatingFactors: "This case has the following mitigating circumstances: {factors}, which may result in a lighter or mitigated punishment",
+                    minorPerpetrator: "The perpetrator is a minor and shall be given a lighter or mitigated punishment",
+                    noteLabel: "Note: ",
+                    explanationLabel: "Explanation: "
+                }
+            }
+        };
+
+        // 当前语言
+        let currentLang = 'zh';
+        
+        // 罪名与刑期对应表 - 将从i18n中获取
+        let crimeSentences = {};
+
+        // 问题数据 - 多语言支持
+        const questions = [
+            {
+                id: 1,
+                options: [
+                    { value: "yes", key: "question1.yes" },
+                    { value: "no", key: "question1.no" }
+                ]
+            },
+            {
+                id: 2,
+                type: "input",
+                inputType: "number",
+                placeholderKey: 2
+            },
+            {
+                id: 3,
+                type: "input",
+                inputType: "number",
+                placeholderKey: 3
+            },
+            {
+                id: 4,
+                options: [
+                    { value: "yes", key: "question4.yes" },
+                    { value: "no", key: "question4.no" }
+                ]
+            },
+            {
+                id: 5,
+                options: [
+                    { value: "yes", key: "question5.yes" },
+                    { value: "no", key: "question5.no" }
+                ]
+            },
+            {
+                id: 6,
+                options: [
+                    { value: "yes", key: "yes" },
+                    { value: "no", key: "no" }
+                ],
+                show: function(answers) {
+                    return answers.q1 === "no";
+                }
+            },
+            {
+                id: 7,
+                options: [
+                    { value: "yes", key: "yes" },
+                    { value: "no", key: "no" }
+                ],
+                show: function(answers) {
+                    return answers.q1 === "no";
+                }
+            },
+            {
+                id: 8,
+                options: [
+                    { value: "yes", key: "yes" },
+                    { value: "no", key: "no" }
+                ],
+                show: function(answers) {
+                    return answers.q1 === "no";
+                }
+            },
+            {
+                id: 9,
+                options: [
+                    { value: "normal", key: "question9.normal" },
+                    { value: "divorce-lawsuit", key: "question9.divorce-lawsuit" },
+                    { value: "dissolved", key: "question9.dissolved" }
+                ],
+                show: function(answers) {
+                    return answers.q1 === "yes";
+                }
+            },
+            {
+                id: 10,
+                options: [
+                    { value: "male-to-female", key: "question10.male-to-female" },
+                    { value: "female-to-male", key: "question10.female-to-male" }
+                ]
+            },
+            {
+                id: 11,
+                options: [
+                    { value: "insertive", key: "question11.insertive" },
+                    { value: "non-insertive", key: "question11.non-insertive" },
+                    { value: "minor-injury-plus", key: "question11.minor-injury-plus" }
+                ],
+                showOptions: function(answers) {
+                    if (answers.q10 === "male-to-female") {
+                        return this.options.slice(0, 2);
+                    } else {
+                        return this.options;
+                    }
+                }
+            },
+            {
+                id: 12,
+                options: [
+                    { value: "vaginal", key: "question12.vaginal" },
+                    { value: "oral", key: "question12.oral" },
+                    { value: "anal", key: "question12.anal" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q11 === "insertive";
+                }
+            },
+            {
+                id: 13,
+                options: [
+                    { value: "hand", key: "question13.hand" },
+                    { value: "breast", key: "question13.breast" },
+                    { value: "other-body", key: "question13.other-body" },
+                    { value: "other-form", key: "question13.other-form" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q11 === "non-insertive";
+                }
+            },
+            {
+                id: 14,
+                options: [
+                    { value: "yes", key: "question14.yes" },
+                    { value: "no", key: "question14.no" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q11 === "insertive" || answers.q11 === "non-insertive";
+                }
+            },
+            {
+                id: 15,
+                options: [
+                    { value: "yes", key: "question15.yes" },
+                    { value: "no", key: "question15.no" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q11 === "insertive" || answers.q11 === "non-insertive";
+                }
+            },
+            {
+                id: 16,
+                options: [
+                    { value: "yes", key: "question16.yes" },
+                    { value: "no", key: "question16.no" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q10 === "male-to-female" && answers.q11 === "insertive";
+                }
+            },
+            {
+                id: 17,
+                options: [
+                    { value: "yes", key: "question17.yes" },
+                    { value: "no", key: "question17.no" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q11 === "insertive" || answers.q11 === "non-insertive" || answers.q11 === "minor-injury-plus";
+                }
+            },
+            {
+                id: 18,
+                options: [
+                    { value: "yes", key: "question18.yes" },
+                    { value: "no", key: "question18.no" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q11 === "insertive" || answers.q11 === "non-insertive" || answers.q11 === "minor-injury-plus";
+                }
+            },
+            {
+                id: 19,
+                options: [
+                    { value: "yes", key: "question19.yes" },
+                    { value: "no", key: "question19.no" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q11 === "insertive" || answers.q11 === "non-insertive" || answers.q11 === "minor-injury-plus";
+                }
+            },
+            {
+                id: 20,
+                options: [
+                    { value: "yes", key: "question20.yes" },
+                    { value: "no", key: "question20.no" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q11 === "insertive" || answers.q11 === "non-insertive" || answers.q11 === "minor-injury-plus";
+                }
+            },
+            {
+                id: 21,
+                options: [
+                    { value: "yes", key: "question21.yes" },
+                    { value: "no", key: "question21.no" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q11 === "insertive" || answers.q11 === "non-insertive" || answers.q11 === "minor-injury-plus";
+                }
+            },
+            {
+                id: 22,
+                options: [
+                    { value: "boy", key: "question22.boy" },
+                    { value: "girl", key: "question22.girl" }
+                ],
+                isExtra: true,
+                show: function(answers) {
+                    return answers.q5 === "yes";
+                }
+            }
+        ];
+
+        // 当前问题索引
+        let currentQuestionIndex = 0;
+        // 用户答案
+        const answers = {};
+        // 跟踪已显示的问题
+        const displayedQuestions = [];
+        
+        // DOM元素
+        const questionNumberEl = document.getElementById('questionNumber');
+        const questionTextEl = document.getElementById('questionText');
+        const optionsContainerEl = document.getElementById('optionsContainer');
+        const prevBtnEl = document.getElementById('prevBtn');
+        const nextBtnEl = document.getElementById('nextBtn');
+        const progressBarEl = document.getElementById('progressBar');
+        const progressTextEl = document.getElementById('progressText');
+        const resultContainerEl = document.getElementById('resultContainer');
+        const resultContentEl = document.getElementById('resultContent');
+        const restartBtnEl = document.getElementById('restartBtn');
+        const menuToggleEl = document.getElementById('menuToggle');
+        const mobileMenuEl = document.getElementById('mobileMenu');
+        const instructionsModal = document.getElementById('instructionsModal');
+        const aboutModal = document.getElementById('aboutModal');
+        const instructionsLink = document.getElementById('instructionsLink');
+        const aboutLink = document.getElementById('aboutLink');
+        const mobileInstructionsLink = document.getElementById('mobileInstructionsLink');
+        const mobileAboutLink = document.getElementById('mobileAboutLink');
+        const closeModalButtons = document.querySelectorAll('.close-modal');
+
+        // 初始化
+        function init() {
+            // 设置初始语言
+            setLanguage(currentLang);
+            
+            // 初始化模态框内容
+            initModalContents();
+            
+            updateDisplayedQuestions();
+            renderCurrentQuestion();
+            setupEventListeners();
+        }
+
+        // 设置语言
+        function setLanguage(lang) {
+            currentLang = lang;
+            
+            // 更新罪名信息
+            crimeSentences = i18n[lang].crimeDetails;
+            
+            // 更新页面静态文本
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const keys = element.getAttribute('data-i18n').split('.');
+                let text = i18n[lang];
+                
+                for (const key of keys) {
+                    if (text[key] !== undefined) {
+                        text = text[key];
+                    } else {
+                        text = null;
+                        break;
+                    }
+                }
+                
+                if (text !== null) {
+                    element.textContent = text;
+                }
+            });
+            
+            // 更新语言按钮样式
+            document.querySelectorAll('.language-btn').forEach(btn => {
+                if (btn.getAttribute('data-lang') === lang) {
+                    btn.classList.add('bg-primary', 'text-white');
+                    btn.classList.remove('bg-white', 'text-gray-600', 'hover:bg-gray-100');
+                } else {
+                    btn.classList.remove('bg-primary', 'text-white');
+                    btn.classList.add('bg-white', 'text-gray-600', 'hover:bg-gray-100');
+                }
+            });
+            
+            // 如果已经有显示的问题，重新渲染当前问题
+            if (displayedQuestions.length > 0) {
+                renderCurrentQuestion();
+            }
+            
+            // 如果结果已经显示，重新渲染结果
+            if (!resultContainerEl.classList.contains('hidden')) {
+                calculateResult();
+                showResult();
+            }
+        }
+
+        // 初始化模态框内容
+        function initModalContents() {
+            // 初始化使用说明内容
+            const instructionsContent = document.getElementById('instructionsContent');
+            instructionsContent.innerHTML = `
+                <p>${i18n[currentLang].instructions.intro}</p>
+                <ul class="list-disc pl-5 space-y-2 mt-2">
+                    <li>${i18n[currentLang].instructions.step1}</li>
+                    <li>${i18n[currentLang].instructions.step2}</li>
+                    <li>${i18n[currentLang].instructions.step3}</li>
+                    <li>${i18n[currentLang].instructions.step4}</li>
+                </ul>
+                <p class="mt-4 text-primary">${i18n[currentLang].instructions.note}</p>
+            `;
+            
+            // 初始化关于内容
+            const aboutContent = document.getElementById('aboutContent');
+            aboutContent.innerHTML = `
+                <p>${i18n[currentLang].about.content}</p>
+                <p class="mt-3 font-medium">${i18n[currentLang].about.legalBasis}</p>
+                <ul class="list-disc pl-5 space-y-1 mt-1">
+                    <li>${i18n[currentLang].about.basis1}</li>
+                    <li>${i18n[currentLang].about.basis2}</li>
+                </ul>
+                <div class="mt-4 p-3 bg-yellow-50 rounded-lg text-sm">
+                    <p>${i18n[currentLang].about.reminder}</p>
+                </div>
+            `;
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 语言切换按钮
+            document.querySelectorAll('.language-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const lang = btn.getAttribute('data-lang');
+                    if (lang !== currentLang) {
+                        setLanguage(lang);
+                    }
+                });
+            });
+            
+            // 模态框相关
+            instructionsLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                instructionsModal.classList.add('active');
+            });
+            
+            aboutLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                aboutModal.classList.add('active');
+            });
+            
+            mobileInstructionsLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                mobileMenuEl.classList.add('hidden');
+                instructionsModal.classList.add('active');
+            });
+            
+            mobileAboutLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                mobileMenuEl.classList.add('hidden');
+                aboutModal.classList.add('active');
+            });
+            
+            closeModalButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    instructionsModal.classList.remove('active');
+                    aboutModal.classList.remove('active');
+                });
+            });
+            
+            // 点击模态框背景关闭
+            instructionsModal.addEventListener('click', (e) => {
+                if (e.target === instructionsModal) {
+                    instructionsModal.classList.remove('active');
+                }
+            });
+            
+            aboutModal.addEventListener('click', (e) => {
+                if (e.target === aboutModal) {
+                    aboutModal.classList.remove('active');
+                }
+            });
+            
+            // 移动端菜单切换
+            menuToggleEl.addEventListener('click', () => {
+                mobileMenuEl.classList.toggle('hidden');
+            });
+            
+            // 上一步按钮
+            prevBtnEl.addEventListener('click', () => {
+                if (currentQuestionIndex > 0) {
+                    currentQuestionIndex--;
+                    renderCurrentQuestion();
+                    updateNavigationButtons();
+                    updateProgress();
+                }
+            });
+
+            // 下一步按钮
+            nextBtnEl.addEventListener('click', () => {
+                if (currentQuestionIndex < displayedQuestions.length - 1) {
+                    currentQuestionIndex++;
+                    renderCurrentQuestion();
+                    updateNavigationButtons();
+                    updateProgress();
+                } else {
+                    const extraQuestion = getNextExtraQuestion();
+                    if (extraQuestion) {
+                        displayedQuestions.push(extraQuestion);
+                        currentQuestionIndex = displayedQuestions.length - 1;
+                        renderCurrentQuestion();
+                        updateNavigationButtons();
+                        updateProgress();
+                    } else {
+                        calculateResult();
+                        showResult();
+                    }
+                }
+            });
+
+            // 重新开始按钮
+            restartBtnEl.addEventListener('click', restart);
+        }
+
+        // 更新应显示的问题列表
+        function updateDisplayedQuestions() {
+            displayedQuestions.length = 0;
+            
+            questions.forEach(question => {
+                if (!question.isExtra && (!question.show || question.show(answers))) {
+                    displayedQuestions.push(question);
+                }
+            });
+            
+            questions.forEach(question => {
+                if (question.isExtra && question.show && question.show(answers) && 
+                    !displayedQuestions.some(q => q.id === question.id)) {
+                    displayedQuestions.push(question);
+                }
+            });
+        }
+
+        // 获取下一个需要显示的额外问题
+        function getNextExtraQuestion() {
+            return questions.find(question => {
+                return question.isExtra && question.show && question.show(answers) && 
+                       !displayedQuestions.some(q => q.id === question.id);
+            });
+        }
+
+        // 获取总问题数
+        function getTotalQuestions() {
+            return displayedQuestions.length;
+        }
+
+        // 渲染当前问题
+        function renderCurrentQuestion() {
+            const question = displayedQuestions[currentQuestionIndex];
+            if (!question) return;
+
+            // 更新问题编号和文本
+            questionNumberEl.textContent = i18n[currentLang].question.number
+                .replace('{current}', currentQuestionIndex + 1)
+                .replace('{total}', getTotalQuestions());
+            
+            questionTextEl.textContent = i18n[currentLang].questions[question.id];
+
+            // 清空选项容器
+            optionsContainerEl.innerHTML = '';
+
+            // 渲染不同类型的问题
+            if (question.type === "input") {
+                // 输入框类型问题（年龄）
+                const inputContainer = document.createElement('div');
+                inputContainer.className = 'space-y-2';
+                
+                const inputEl = document.createElement('input');
+                inputEl.type = question.inputType || 'text';
+                inputEl.placeholder = i18n[currentLang].placeholders[question.placeholderKey];
+                inputEl.className = 'input-field';
+                inputEl.value = answers[`q${question.id}`] || '';
+                
+                inputEl.addEventListener('input', (e) => {
+                    // 确保输入是有效的数字
+                    if (question.inputType === 'number') {
+                        const value = parseInt(e.target.value);
+                        if (!isNaN(value) && value >= 0 && value <= 120) {
+                            answers[`q${question.id}`] = value;
+                        } else {
+                            answers[`q${question.id}`] = '';
+                        }
+                    } else {
+                        answers[`q${question.id}`] = e.target.value;
+                    }
+                    updateNavigationButtons();
+                });
+                
+                inputContainer.appendChild(inputEl);
+                optionsContainerEl.appendChild(inputContainer);
+            } else {
+                // 选项类型问题
+                let optionsToShow = question.options;
+                if (question.showOptions) {
+                    optionsToShow = question.showOptions(answers);
+                }
+
+                optionsToShow.forEach(option => {
+                    const optionBtn = document.createElement('button');
+                    optionBtn.className = `option-btn ${answers[`q${question.id}`] === option.value ? 'option-btn-selected' : ''}`;
+                    
+                    // 获取选项的翻译文本
+                    let optionText = '';
+                    if (option.key.includes('.')) {
+                        const keys = option.key.split('.');
+                        optionText = i18n[currentLang].options[keys[0]][keys[1]];
+                    } else {
+                        optionText = i18n[currentLang].options[option.key];
+                    }
+                    
+                    optionBtn.innerHTML = `
+                        <div class="flex items-center">
+                            <div class="w-5 h-5 rounded-full border ${answers[`q${question.id}`] === option.value ? 'border-primary bg-primary text-white' : 'border-gray-300'} flex items-center justify-center mr-3">
+                                ${answers[`q${question.id}`] === option.value ? '<i class="fa fa-check text-xs"></i>' : ''}
+                            </div>
+                            <span>${optionText}</span>
+                        </div>
+                    `;
+                    optionBtn.addEventListener('click', () => {
+                        answers[`q${question.id}`] = option.value;
+                        
+                        // 如果回答了影响问题显示的关键问题，重新计算显示的问题
+                        if ([1, 10, 11].includes(question.id)) {
+                            updateDisplayedQuestions();
+                            if (currentQuestionIndex >= displayedQuestions.length) {
+                                currentQuestionIndex = displayedQuestions.length - 1;
+                            }
+                        }
+                        
+                        renderCurrentQuestion();
+                        updateNavigationButtons();
+                    });
+                    optionsContainerEl.appendChild(optionBtn);
+                });
+            }
+
+            // 添加进入动画
+            optionsContainerEl.classList.add('opacity-0');
+            setTimeout(() => {
+                optionsContainerEl.classList.remove('opacity-0');
+                optionsContainerEl.classList.add('transition-opacity', 'duration-300', 'opacity-100');
+            }, 50);
+        }
+
+        // 更新导航按钮状态
+        function updateNavigationButtons() {
+            const currentQuestion = displayedQuestions[currentQuestionIndex];
+            
+            // 上一步按钮
+            if (currentQuestionIndex === 0) {
+                prevBtnEl.disabled = true;
+                prevBtnEl.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                prevBtnEl.disabled = false;
+                prevBtnEl.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+            
+            // 下一步按钮
+            if (currentQuestion.type === "input") {
+                // 输入框类型问题验证
+                nextBtnEl.disabled = !answers[`q${currentQuestion.id}`];
+            } else {
+                // 选项类型问题验证
+                nextBtnEl.disabled = answers[`q${currentQuestion.id}`] === undefined;
+            }
+            
+            if (nextBtnEl.disabled) {
+                nextBtnEl.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                nextBtnEl.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // 更新进度条
+        function updateProgress() {
+            const progress = ((currentQuestionIndex + 1) / getTotalQuestions()) * 100;
+            progressBarEl.style.width = `${progress}%`;
+            progressTextEl.textContent = `${currentQuestionIndex + 1}/${getTotalQuestions()}`;
+        }
+
+        // 判断是否为未成年人
+        function isMinor(age) {
+            return age < 18;
+        }
+
+        // 计算结果
+        function calculateResult() {
+            const results = [];
+            const factors = {
+                hasSeriousCircumstances: false,
+                hasMitigatingCircumstances: false
+            };
+            
+            // 检查加重情节
+            if (answers.q14 === "yes" || answers.q15 === "yes" || answers.q16 === "yes" || 
+                answers.q17 === "yes" || answers.q18 === "yes" || answers.q19 === "yes") {
+                factors.hasSeriousCircumstances = true;
+            }
+            
+            // 检查减轻情节
+            if (answers.q20 === "yes" || answers.q21 === "yes") {
+                factors.hasMitigatingCircumstances = true;
+            }
+            
+            // 检查是否造成轻伤二级以上
+            if (answers.q4 === "yes") {
+                results.push("故意伤害罪");
+            }
+            
+            // 检查是否针对未成年人（结合年龄判断）
+            const victimAge = parseInt(answers.q3) || 0;
+            if (isMinor(victimAge) || answers.q5 === "yes") {
+                if (answers.q22 === "boy") {
+                    results.push("猥亵儿童罪");
+                } else {
+                    results.push("强奸罪从重");
+                }
+            }
+            
+            // 根据婚姻关系判断
+            if (answers.q1 === "no") {
+                // 非婚姻关系
+                if (answers.q10 === "male-to-female") {
+                    // 男→女
+                    if (answers.q11 === "insertive") {
+                        // 插入式性交
+                        if (!isMinor(victimAge) && answers.q5 !== "yes") {
+                            results.push("强奸罪");
+                        }
+                    } else if (answers.q11 === "non-insertive") {
+                        // 非插入猥亵
+                        results.push("强制猥亵罪");
+                    }
+                } else {
+                    // 女→男
+                    if (answers.q11 === "insertive") {
+                        // 插入式性交
+                        if (!isMinor(victimAge) && answers.q5 !== "yes") {
+                            results.push("治安处罚");
+                        }
+                    } else if (answers.q11 === "non-insertive") {
+                        // 非插入猥亵
+                        results.push("强制猥亵罪");
+                    } else {
+                        // 致轻伤+
+                        if (answers.q4 !== "yes") {
+                            results.push("故意伤害罪");
+                        }
+                    }
+                }
+            } else {
+                // 婚姻关系
+                if (answers.q9 === "normal") {
+                    results.push("不构罪");
+                } else if (answers.q9 === "divorce-lawsuit") {
+                    if (answers.q10 === "male-to-female") {
+                        results.push("可构成强奸罪");
+                    } else {
+                        results.push("可能强制猥亵罪");
+                    }
+                } else {
+                    // 婚姻解除/无效
+                    if (answers.q10 === "male-to-female") {
+                        results.push("构成强奸罪");
+                    } else {
+                        results.push("可能强制猥亵罪");
+                    }
+                }
+            }
+            
+            // 返回结果和相关因素
+            return {
+                crimes: [...new Set(results)],
+                factors: factors
+            };
+        }
+
+        // 显示结果
+        function showResult() {
+            const { crimes, factors } = calculateResult();
+            const victimAge = parseInt(answers.q3) || 0;
+            const perpetratorAge = parseInt(answers.q2) || 0;
+            
+            resultContentEl.innerHTML = '';
+            
+            // 添加用户选择的关键信息摘要
+            const summaryEl = document.createElement('div');
+            summaryEl.className = 'mb-6 p-4 bg-gray-50 rounded-lg';
+            summaryEl.innerHTML = `<h3 class="font-medium text-gray-700 mb-3">${i18n[currentLang].summary.title}</h3>`;
+            
+            const summaryList = document.createElement('ul');
+            summaryList.className = 'space-y-2 text-sm text-gray-600';
+            
+            // 年龄信息
+            summaryList.innerHTML += `<li><span class="font-medium">${i18n[currentLang].summary.agePerpetrator}</span>${perpetratorAge} ${i18n[currentLang].summary.years} ${isMinor(perpetratorAge) ? `<span class="sentence-badge">${i18n[currentLang].summary.minor}</span>` : ''}</li>`;
+            summaryList.innerHTML += `<li><span class="font-medium">${i18n[currentLang].summary.ageVictim}</span>${victimAge} ${i18n[currentLang].summary.years} ${isMinor(victimAge) ? `<span class="sentence-badge">${i18n[currentLang].summary.minor}</span>` : ''}</li>`;
+            
+            // 婚姻状况
+            let maritalStatusText = '';
+            if (answers.q1 === "yes") {
+                let statusText = '';
+                if (answers.q9 === "normal") statusText = i18n[currentLang].summary.maritalStatusNormal;
+                else if (answers.q9 === "divorce-lawsuit") statusText = i18n[currentLang].summary.maritalStatusDivorce;
+                else statusText = i18n[currentLang].summary.maritalStatusDissolved;
+                
+                maritalStatusText = i18n[currentLang].summary.maritalStatusYes.replace('{status}', statusText);
+            } else {
+                const relations = [];
+                if (answers.q6 === "yes") relations.push(i18n[currentLang].summary.relationshipLove);
+                if (answers.q7 === "yes") relations.push(i18n[currentLang].summary.relationshipEngaged);
+                if (answers.q8 === "yes") relations.push(i18n[currentLang].summary.relationshipLiving);
+                
+                const relationsText = relations.length > 0 ? relations.join("; ") : i18n[currentLang].summary.relationshipNone;
+                maritalStatusText = i18n[currentLang].summary.maritalStatusNo.replace('{relations}', relationsText);
+            }
+            summaryList.innerHTML += `<li><span class="font-medium">${i18n[currentLang].summary.maritalStatus}</span>${maritalStatusText}</li>`;
+            
+            // 加害方与受害方性别
+            const genderRelationText = answers.q10 === "male-to-female" ? 
+                i18n[currentLang].options.question10["male-to-female"] : 
+                i18n[currentLang].options.question10["female-to-male"];
+            summaryList.innerHTML += `<li><span class="font-medium">${i18n[currentLang].summary.genderRelation}</span>${genderRelationText}</li>`;
+            
+            // 行为性质
+            let behaviorText = "";
+            if (answers.q11 === "insertive") {
+                let partText = '';
+                if (answers.q12 === "vaginal") partText = i18n[currentLang].summary.bodyPartVaginal;
+                else if (answers.q12 === "oral") partText = i18n[currentLang].summary.bodyPartOral;
+                else partText = i18n[currentLang].summary.bodyPartAnal;
+                
+                behaviorText = i18n[currentLang].summary.behaviorInsertive.replace('{part}', partText);
+            } else if (answers.q11 === "non-insertive") {
+                let methodText = '';
+                if (answers.q13 === "hand") methodText = i18n[currentLang].summary.contactHand;
+                else if (answers.q13 === "breast") methodText = i18n[currentLang].summary.contactBreast;
+                else if (answers.q13 === "other-body") methodText = i18n[currentLang].summary.contactOtherBody;
+                else methodText = i18n[currentLang].summary.contactOtherForm;
+                
+                behaviorText = i18n[currentLang].summary.behaviorNonInsertive.replace('{method}', methodText);
+            } else {
+                behaviorText = i18n[currentLang].summary.behaviorInjury;
+            }
+            summaryList.innerHTML += `<li><span class="font-medium">${i18n[currentLang].summary.behaviorNature}</span>${behaviorText}</li>`;
+            
+            // 加重情节
+            const seriousFactors = [];
+            if (answers.q14 === "yes") seriousFactors.push(i18n[currentLang].summary.factorMultiple);
+            if (answers.q15 === "yes") seriousFactors.push(i18n[currentLang].summary.factorPublic);
+            if (answers.q16 === "yes") seriousFactors.push(i18n[currentLang].summary.factorGangRape);
+            if (answers.q17 === "yes") seriousFactors.push(i18n[currentLang].summary.factorSeriousInjury);
+            if (answers.q18 === "yes") seriousFactors.push(i18n[currentLang].summary.factorDeath);
+            if (answers.q19 === "yes") seriousFactors.push(i18n[currentLang].summary.factorOtherSerious);
+            
+            summaryList.innerHTML += `<li><span class="font-medium">${i18n[currentLang].summary.aggravatingFactors}</span>${seriousFactors.length > 0 ? 
+                seriousFactors.join("; ") : i18n[currentLang].summary.factorNo}</li>`;
+            
+            // 减轻情节
+            const mitigatingFactors = [];
+            if (answers.q20 === "yes") mitigatingFactors.push(i18n[currentLang].summary.factorPardon);
+            if (answers.q21 === "yes") mitigatingFactors.push(i18n[currentLang].summary.factorWithdraw);
+            
+            summaryList.innerHTML += `<li><span class="font-medium">${i18n[currentLang].summary.mitigatingFactors}</span>${mitigatingFactors.length > 0 ? 
+                mitigatingFactors.join("; ") : i18n[currentLang].summary.factorNo}</li>`;
+            
+            summaryEl.appendChild(summaryList);
+            resultContentEl.appendChild(summaryEl);
+            
+            // 判定结果及刑期
+            if (crimes.length > 0) {
+                const resultList = document.createElement('div');
+                resultList.className = 'space-y-6';
+                
+                crimes.forEach((crime, index) => {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'p-4 bg-gray-50 rounded-lg';
+                    
+                    // 获取翻译后的罪名
+                    const crimeName = i18n[currentLang].crimes[crime];
+                    
+                    // 获取刑期信息，处理引用关系
+                    let sentenceInfo = crimeSentences[crime];
+                    if (sentenceInfo && sentenceInfo.sameAs) {
+                        sentenceInfo = { ...sentenceInfo, ...crimeSentences[sentenceInfo.sameAs] };
+                    }
+                    
+                    // 构建结果HTML
+                    let sentenceHtml = `<h3 class="font-semibold text-lg mb-2">${index + 1}. ${crimeName}</h3>`;
+                    
+                    // 根据加重和减轻情节调整刑期说明
+                    if (sentenceInfo && sentenceInfo.basic) {
+                        sentenceHtml += `<div class="space-y-2">`;
+                        
+                        // 基础刑期
+                        sentenceHtml += `<p><span class="font-medium">${i18n[currentLang].resultText.basicSentence}</span>${sentenceInfo.basic}</p>`;
+                        
+                        // 加重刑期
+                        if (sentenceInfo.medium) {
+                            sentenceHtml += `<p><span class="font-medium">${i18n[currentLang].resultText.mediumSentence}</span>${sentenceInfo.medium}</p>`;
+                        }
+                        
+                        if (sentenceInfo.severe) {
+                            sentenceHtml += `<p><span class="font-medium">${i18n[currentLang].resultText.severeSentence}</span>${sentenceInfo.severe}</p>`;
+                        }
+                        
+                        // 显示适用的严重情节
+                        if (sentenceInfo.severeConditions && factors.hasSeriousCircumstances) {
+                            sentenceHtml += `<p class="text-danger text-sm"><i class="fa fa-exclamation-circle mr-1"></i>${i18n[currentLang].resultText.severeFactors.replace('{factors}', seriousFactors.join("; "))}</p>`;
+                        }
+                        
+                        // 显示减轻情节影响
+                        if (factors.hasMitigatingCircumstances) {
+                            sentenceHtml += `<p class="text-success text-sm"><i class="fa fa-info-circle mr-1"></i>${i18n[currentLang].resultText.mitigatingFactors.replace('{factors}', mitigatingFactors.join("; "))}</p>`;
+                        }
+                        
+                        // 年龄相关影响
+                        if (isMinor(perpetratorAge)) {
+                            sentenceHtml += `<p class="text-primary text-sm"><i class="fa fa-info-circle mr-1"></i>${i18n[currentLang].resultText.minorPerpetrator}</p>`;
+                        }
+                        
+                        if (sentenceInfo.note) {
+                            sentenceHtml += `<p class="text-primary text-sm"><i class="fa fa-info-circle mr-1"></i>${sentenceInfo.note}</p>`;
+                        }
+                        
+                        sentenceHtml += `</div>`;
+                    } else if (sentenceInfo && sentenceInfo.content) {
+                        sentenceHtml += `<p>${sentenceInfo.content}</p>`;
+                        
+                        // 减轻情节影响
+                        if (factors.hasMitigatingCircumstances) {
+                            sentenceHtml += `<p class="text-success text-sm mt-2"><i class="fa fa-info-circle mr-1"></i>${i18n[currentLang].resultText.mitigatingFactors.replace('{factors}', mitigatingFactors.join("; "))}</p>`;
+                        }
+                    }
+                    
+                    if (sentenceInfo && sentenceInfo.explanation) {
+                        sentenceHtml += `<p class="mt-2 text-sm text-gray-600"><span class="font-medium">${i18n[currentLang].resultText.explanationLabel}</span>${sentenceInfo.explanation}</p>`;
+                    }
+                    
+                    if (sentenceInfo && sentenceInfo.article) {
+                        sentenceHtml += `<p class="law-article">${sentenceInfo.article}</p>`;
+                    }
+                    
+                    resultItem.innerHTML = sentenceHtml;
+                    resultList.appendChild(resultItem);
+                });
+                
+                resultContentEl.appendChild(resultList);
+            } else {
+                const noResult = document.createElement('div');
+                noResult.className = 'text-center py-6';
+                noResult.innerHTML = `
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 text-gray-500 mb-4">
+                        <i class="fa fa-info text-xl"></i>
+                    </div>
+                    <p class="text-gray-600">${i18n[currentLang].crimes["不构罪"]}</p>
+                `;
+                resultContentEl.appendChild(noResult);
+            }
+            
+            // 显示结果
+            document.querySelector('#optionsContainer').parentElement.classList.add('hidden');
+            document.querySelector('#prevBtn').parentElement.classList.add('hidden');
+            resultContainerEl.classList.remove('hidden');
+            
+            // 添加动画
+            resultContainerEl.classList.add('opacity-0', 'translate-y-4');
+            setTimeout(() => {
+                resultContainerEl.classList.remove('opacity-0', 'translate-y-4');
+                resultContainerEl.classList.add('transition-all', 'duration-500', 'opacity-100', 'translate-y-0');
+            }, 100);
+        }
+
+        // 重新开始
+        function restart() {
+            currentQuestionIndex = 0;
+            displayedQuestions.length = 0;
+            for (const key in answers) {
+                delete answers[key];
+            }
+            
+            updateDisplayedQuestions();
+            
+            resultContainerEl.classList.add('hidden');
+            document.querySelector('#optionsContainer').parentElement.classList.remove('hidden');
+            document.querySelector('#prevBtn').parentElement.classList.remove('hidden');
+            
+            renderCurrentQuestion();
+            updateNavigationButtons();
+            updateProgress();
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
